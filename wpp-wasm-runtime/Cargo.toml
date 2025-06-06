@@ -1,0 +1,17 @@
+[package]
+name = "wpp-wasm-runtime"
+version = "0.1.0"
+edition = "2021"
+
+
+
+[dependencies]
+serde = { version = "1.0.219", features = ["derive"] }
+serde_json = "1.0.140"
+wasm-bindgen = "0.2"
+wasm-encoder = "0.24.1"
+
+
+[dependencies.web-sys]
+version = "0.3"
+features = ["CanvasRenderingContext2d", "HtmlCanvasElement", "Document", "Window"]
