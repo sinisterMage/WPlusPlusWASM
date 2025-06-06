@@ -392,16 +392,32 @@ namespace WPlusPlus
                             return new AltersNode(child, parent, methodList);
                         }
                         case "box":
+                        {
+                            Advance(); // consume 'box'
+
+                            var x = int.Parse(Advance().Value);
+                            var y = int.Parse(Advance().Value);
+                            var width = int.Parse(Advance().Value);
+                            var height = int.Parse(Advance().Value);
+
+                            return new BoxNode(x, y, width, height);
+                        }
+case "group":
 {
-    Advance(); // consume 'box'
+    Advance(); // consume 'group'
+    Expect("{");
 
-    var x = int.Parse(Advance().Value);
-    var y = int.Parse(Advance().Value);
-    var width = int.Parse(Advance().Value);
-    var height = int.Parse(Advance().Value);
+    var children = new List<Node>();
+    while (!(Match(TokenType.Symbol) && Peek().Value == "}"))
+    {
+        children.Add(ParseStatement());
+    }
 
-    return new BoxNode(x, y, width, height);
+    Expect("}");
+
+    return new GroupNode(children);
 }
+
 
 
 

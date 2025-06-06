@@ -72,6 +72,7 @@ namespace WPlusPlus
 (TokenType.Keyword, @"\bancestor\b"),
 (TokenType.Keyword, @"\bnew\b"),
 (TokenType.Keyword, @"\balters\b"),
+(TokenType.Keyword, @"\bgroup\b"),
 
 
 

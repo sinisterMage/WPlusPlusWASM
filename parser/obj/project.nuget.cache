@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "iT72LcAbHIQ=",
+  "dgSpecHash": "QCfHKRm0z24=",
   "success": true,
-  "projectFilePath": "C:\\Users\\ofekb\\source\\repos\\WPlusPlusVM\\parser\\parser.csproj",
+  "projectFilePath": "C:\\Users\\ofekb\\source\\repos\\WPlusPlusVM\\WPlusPlusWASM\\parser\\parser.csproj",
   "expectedPackageFiles": [],
   "logs": []
 }

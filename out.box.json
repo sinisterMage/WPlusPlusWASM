@@ -1,14 +1,21 @@
 [
   {
-    "X": 50,
-    "Y": 40,
-    "Width": 160,
-    "Height": 100
-  },
-  {
-    "X": 220,
-    "Y": 80,
-    "Width": 200,
-    "Height": 60
+    "Kind": "Group",
+    "Children": [
+      {
+        "Kind": "Box",
+        "X": 20,
+        "Y": 30,
+        "Width": 100,
+        "Height": 50
+      },
+      {
+        "Kind": "Box",
+        "X": 150,
+        "Y": 30,
+        "Width": 80,
+        "Height": 60
+      }
+    ]
   }
 ]

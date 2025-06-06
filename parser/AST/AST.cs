@@ -228,19 +228,23 @@ namespace WPlusPlus.AST
             Arguments = arguments;
         }
     }
-public class BoxNode : Node {
-    public int X { get; set; }
-    public int Y { get; set; }
-    public int Width { get; set; }
-    public int Height { get; set; }
+    public class BoxNode : Node
+    {
+        public int X { get; set; }
+        public int Y { get; set; }
+        public int Width { get; set; }
+        public int Height { get; set; }
 
-    public BoxNode(int x, int y, int width, int height) {
-        X = x;
-        Y = y;
-        Width = width;
-        Height = height;
+        public BoxNode(int x, int y, int width, int height)
+        {
+            X = x;
+            Y = y;
+            Width = width;
+            Height = height;
+        }
     }
-}
+
+
 
 
 
