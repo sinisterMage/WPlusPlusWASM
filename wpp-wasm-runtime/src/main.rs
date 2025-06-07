@@ -7,6 +7,14 @@ mod memory;
 use std::fs;
 use transpile::compile_to_wasm;
 use parser::{Node, parse_wpp};
+use gc::gc_collect;
+
+/// Optional GC export to allow JS to trigger cleanup.
+#[no_mangle]
+pub extern "C" fn gc_tick() {
+    gc_collect();
+    println!("🧹 GC tick called from WASM runtime");
+}
 
 fn main() {
     // Step 1: Read W++ source file
@@ -24,4 +32,8 @@ fn main() {
     fs::write("ui.wpp.map.json", semantic_map_json).expect("❌ Failed to write semantic map");
 
     println!("✅ Compilation complete: ui.wasm & ui.wpp.map.json");
+
+    // Step 5: Optional GC collection pass after compile
+    gc_collect();
+    println!("🧹 GC run complete");
 }

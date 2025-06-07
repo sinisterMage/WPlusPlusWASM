@@ -14,7 +14,7 @@
     },
     {
       "kind": "text",
-      "wasm_offset": 33,
+      "wasm_offset": 38,
       "pointer": null,
       "source": "wpp:text='Hello, WASM!'",
       "props": {
@@ -25,7 +25,7 @@
     },
     {
       "kind": "box",
-      "wasm_offset": 164,
+      "wasm_offset": 169,
       "pointer": null,
       "source": "wpp:x=140,y=30",
       "props": {
@@ -37,7 +37,7 @@
     },
     {
       "kind": "text",
-      "wasm_offset": 197,
+      "wasm_offset": 207,
       "pointer": null,
       "source": "wpp:text='This shows!'",
       "props": {
@@ -48,7 +48,7 @@
     },
     {
       "kind": "box",
-      "wasm_offset": 320,
+      "wasm_offset": 330,
       "pointer": null,
       "source": "wpp:x=140,y=80",
       "props": {
@@ -60,7 +60,7 @@
     },
     {
       "kind": "text",
-      "wasm_offset": 353,
+      "wasm_offset": 368,
       "pointer": null,
       "source": "wpp:text='This won't'",
       "props": {
@@ -71,7 +71,7 @@
     },
     {
       "kind": "box",
-      "wasm_offset": 468,
+      "wasm_offset": 483,
       "pointer": null,
       "source": "wpp:x=240,y=30",
       "props": {
@@ -83,7 +83,7 @@
     },
     {
       "kind": "text",
-      "wasm_offset": 501,
+      "wasm_offset": 521,
       "pointer": null,
       "source": "wpp:text='False!'",
       "props": {
@@ -94,7 +94,7 @@
     },
     {
       "kind": "box",
-      "wasm_offset": 584,
+      "wasm_offset": 604,
       "pointer": null,
       "source": "wpp:x=240,y=80",
       "props": {
@@ -106,7 +106,7 @@
     },
     {
       "kind": "text",
-      "wasm_offset": 617,
+      "wasm_offset": 642,
       "pointer": null,
       "source": "wpp:text='Fallback'",
       "props": {

@@ -42,9 +42,14 @@ function add_root(ptr) {
 
 // === GC trigger (stub for now) ===
 function gc_collect() {
-    console.log("🧹 GC triggered (stub, no sweep logic yet)");
-    // Future: mark all roots, follow children, sweep
+    if (typeof instance !== "undefined") {
+        instance.exports.gc_tick(); // calls Rust-side mark-and-sweep
+        console.log("🧹 GC triggered from JS → WASM");
+    } else {
+        console.warn("⚠️ Cannot call GC, WASM instance not ready");
+    }
 }
+
 
 // === Canvas draw hooks ===
 function drawRect(x, y, w, h) {
@@ -125,6 +130,7 @@ async function runWasm() {
                 gc_alloc,
                 add_root,
                 gc_collect,
+                gc_tick: () => {},
             },
         });
 
