@@ -6,7 +6,9 @@ pub enum Node {
     Group(Vec<Node>),
     Box { x: i32, y: i32, width: i32, height: i32 },
     If { condition: Expr, then_body: Vec<Node>, else_body: Option<Vec<Node>> },
+        Text { x: i32, y: i32, value: String },
     Print(String),
+    Expr(Expr),
     
 }
 
@@ -29,6 +31,7 @@ pub enum Expr {
 enum Token {
     Ident(String),
     Number(i32),
+    String(String), 
     LBrace,
     RBrace,
     LParen,
@@ -59,6 +62,7 @@ impl<'a> Lexer<'a> {
             ')' => { self.input.next(); return Token::RParen; }
             ':' => { self.input.next(); return Token::Colon; }
             ',' => { self.input.next(); return Token::Comma; }
+            '"' => return self.read_string(),
             '0'..='9' => return self.read_number(),
             c if c.is_alphabetic() => return self.read_ident(),
             c if c.is_whitespace() => {
@@ -88,6 +92,39 @@ impl<'a> Lexer<'a> {
 
     Token::EOF
 }
+fn read_string(&mut self) -> Token {
+    self.input.next(); // Skip the opening quote
+    let mut value = String::new();
+
+    while let Some(&c) = self.input.peek() {
+        match c {
+            '"' => {
+                self.input.next(); // Consume closing quote
+                break;
+            }
+            '\\' => {
+                self.input.next(); // Skip the '\'
+                if let Some(&escaped) = self.input.peek() {
+                    value.push(match escaped {
+                        'n' => '\n',
+                        't' => '\t',
+                        '"' => '"',
+                        '\\' => '\\',
+                        other => other,
+                    });
+                    self.input.next(); // Consume escaped character
+                }
+            }
+            _ => {
+                value.push(c);
+                self.input.next();
+            }
+        }
+    }
+
+    Token::String(value)
+}
+
 
     fn read_number(&mut self) -> Token {
         let mut num = String::new();
@@ -157,39 +194,51 @@ impl Parser {
     }
 
     fn parse_nodes(&mut self) -> Vec<Node> {
-        let mut nodes = Vec::new();
-        while self.pos < self.tokens.len() {
-           match self.peek() {
-    Token::Ident(ref s) if s == "if" => nodes.push(self.parse_if()),
-    Token::Ident(ref s) if s == "group" => nodes.push(self.parse_group()),
-    Token::Ident(ref s) if s == "box" => nodes.push(self.parse_box()),
-    _ => break,
+    let mut nodes = Vec::new();
+    while self.pos < self.tokens.len() {
+        match self.peek() {
+            Token::Ident(ref s) => match s.as_str() {
+                "box" => nodes.push(self.parse_box()),
+                "group" => nodes.push(self.parse_group()),
+                "if" => nodes.push(self.parse_if()),
+                "text" => nodes.push(self.parse_text()),
+                _ => panic!("Unexpected identifier '{}'", s),
+            },
+            Token::Number(_) | Token::LParen => {
+                // ✅ Top-level expression
+                let expr = self.parse_expr();
+                nodes.push(Node::Expr(expr));
+            }
+            _ => break,
+        }
+    }
+    nodes
 }
 
-        }
-        nodes
-    }
 
     fn parse_group(&mut self) -> Node {
-        self.expect(Token::Ident("group".to_string()));
-        self.expect(Token::LBrace);
+    self.expect(Token::Ident("group".to_string()));
+    self.expect(Token::LBrace);
 
-        let mut children = Vec::new();
-        while self.peek() != Token::RBrace {
-            if let Token::Ident(ref s) = self.peek() {
-                if s == "box" {
-                    children.push(self.parse_box());
-                } else {
-                    panic!("Unexpected identifier in group: {:?}", s);
-                }
-            } else {
-                panic!("Unexpected token in group");
+    let mut children = Vec::new();
+    while self.peek() != Token::RBrace {
+        if let Token::Ident(ref s) = self.peek() {
+            match s.as_str() {
+                "box" => children.push(self.parse_box()),
+                "text" => children.push(self.parse_text()),
+                "if" => children.push(self.parse_if()),
+                "group" => children.push(self.parse_group()),
+                _ => panic!("Unexpected identifier in group: {:?}", s),
             }
+        } else {
+            panic!("Unexpected token in group");
         }
-
-        self.expect(Token::RBrace);
-        Node::Group(children)
     }
+
+    self.expect(Token::RBrace);
+    Node::Group(children)
+}
+
 
     fn parse_box(&mut self) -> Node {
     self.expect_ident("box");
@@ -236,6 +285,60 @@ fn expect_number(&mut self) -> i32 {
     match self.advance() {
         Token::Number(n) => n,
         t => panic!("Expected number, got {:?}", t),
+    }
+}
+fn parse_text(&mut self) -> Node {
+    self.expect_ident("text");
+    self.expect(Token::LParen);
+
+    let mut x = None;
+    let mut y = None;
+    let mut value = None;
+
+    while self.peek() != Token::RParen {
+        match self.advance() {
+            Token::Ident(name) => {
+                self.expect(Token::Colon);
+                match name.as_str() {
+                    "x" => {
+                        if let Token::Number(n) = self.advance() {
+                            x = Some(n);
+                        } else {
+                            panic!("Expected number for x");
+                        }
+                    }
+                    "y" => {
+                        if let Token::Number(n) = self.advance() {
+                            y = Some(n);
+                        } else {
+                            panic!("Expected number for y");
+                        }
+                    }
+                    "value" => {
+                        if let Token::String(s) = self.advance() {
+    value = Some(s);
+} else {
+    panic!("Expected string for value");
+}
+
+                    }
+                    _ => panic!("Unknown text property '{}'", name),
+                }
+
+                if self.peek() == Token::Comma {
+                    self.advance();
+                }
+            }
+            t => panic!("Expected identifier in text(), got {:?}", t),
+        }
+    }
+
+    self.expect(Token::RParen);
+
+    Node::Text {
+        x: x.expect("Missing x"),
+        y: y.expect("Missing y"),
+        value: value.expect("Missing value"),
     }
 }
 
@@ -333,9 +436,11 @@ fn parse_node(&mut self) -> Node {
         Token::Ident(ref s) if s == "box" => self.parse_box(),
         Token::Ident(ref s) if s == "group" => self.parse_group(),
         Token::Ident(ref s) if s == "if" => self.parse_if(),
+        Token::Ident(ref s) if s == "text" => self.parse_text(),
         _ => panic!("Unexpected token: {:?}", self.peek()),
     }
 }
+
 fn expect_ident(&mut self, expected: &str) {
     match self.advance() {
         Token::Ident(s) if s == expected => {},

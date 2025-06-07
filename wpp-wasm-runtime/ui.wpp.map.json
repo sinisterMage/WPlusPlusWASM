@@ -13,16 +13,114 @@
       }
     },
     {
-      "kind": "box",
-      "wasm_offset": 30,
+      "kind": "text",
+      "wasm_offset": 33,
       "pointer": null,
-      "source": "wpp:x=0,y=0",
+      "source": "wpp:text='Hello, WASM!'",
       "props": {
-        "height": 10,
-        "width": 10,
-        "x": 0,
-        "y": 0
+        "value": "Hello, WASM!",
+        "x": 25,
+        "y": 40
       }
+    },
+    {
+      "kind": "box",
+      "wasm_offset": 164,
+      "pointer": null,
+      "source": "wpp:x=140,y=30",
+      "props": {
+        "height": 40,
+        "width": 80,
+        "x": 140,
+        "y": 30
+      }
+    },
+    {
+      "kind": "text",
+      "wasm_offset": 197,
+      "pointer": null,
+      "source": "wpp:text='This shows!'",
+      "props": {
+        "value": "This shows!",
+        "x": 145,
+        "y": 40
+      }
+    },
+    {
+      "kind": "box",
+      "wasm_offset": 320,
+      "pointer": null,
+      "source": "wpp:x=140,y=80",
+      "props": {
+        "height": 40,
+        "width": 80,
+        "x": 140,
+        "y": 80
+      }
+    },
+    {
+      "kind": "text",
+      "wasm_offset": 353,
+      "pointer": null,
+      "source": "wpp:text='This won't'",
+      "props": {
+        "value": "This won't",
+        "x": 145,
+        "y": 90
+      }
+    },
+    {
+      "kind": "box",
+      "wasm_offset": 468,
+      "pointer": null,
+      "source": "wpp:x=240,y=30",
+      "props": {
+        "height": 40,
+        "width": 80,
+        "x": 240,
+        "y": 30
+      }
+    },
+    {
+      "kind": "text",
+      "wasm_offset": 501,
+      "pointer": null,
+      "source": "wpp:text='False!'",
+      "props": {
+        "value": "False!",
+        "x": 245,
+        "y": 40
+      }
+    },
+    {
+      "kind": "box",
+      "wasm_offset": 584,
+      "pointer": null,
+      "source": "wpp:x=240,y=80",
+      "props": {
+        "height": 40,
+        "width": 80,
+        "x": 240,
+        "y": 80
+      }
+    },
+    {
+      "kind": "text",
+      "wasm_offset": 617,
+      "pointer": null,
+      "source": "wpp:text='Fallback'",
+      "props": {
+        "value": "Fallback",
+        "x": 245,
+        "y": 90
+      }
+    },
+    {
+      "kind": "group",
+      "wasm_offset": 0,
+      "pointer": null,
+      "source": null,
+      "props": null
     }
   ]
 }
