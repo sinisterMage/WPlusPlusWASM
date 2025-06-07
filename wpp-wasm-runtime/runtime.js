@@ -7,33 +7,37 @@ function gc_alloc(size) {
     const addr = nextAlloc;
     nextAlloc += size;
 
-    console.log(`🧠 Allocated ${size} bytes at 0x${addr.toString(16)}`);
+    console.log(`🧠 Allocated ${size} bytes at 0x${addr.toString(16)} (${size} bytes)`);
     return addr;
 }
 
-// === Canvas draw ===
+// === Canvas draw hook ===
 function drawRect(x, y, w, h) {
     const canvas = document.getElementById("screen");
-    const ctx = canvas.getContext("2d");
+    if (!canvas) {
+        console.warn("⚠️ Canvas element #screen not found.");
+        return;
+    }
 
+    const ctx = canvas.getContext("2d");
     ctx.fillStyle = "blue";
     ctx.fillRect(x, y, w, h);
 
-    console.log(`🟦 Drew rect: (${x}, ${y}, ${w}, ${h})`);
+    console.log(`🟦 drewRect(${x}, ${y}, ${w}, ${h})`);
 }
 
-// === Optional debug overlay ===
+// === Optional Semantic Overlay ===
 async function loadSemanticMap() {
     try {
         const res = await fetch("ui.wpp.map.json");
         const map = await res.json();
 
-        console.log("🧠 Semantic Map Loaded:");
+        console.log("📌 Semantic Map:");
         const canvas = document.getElementById("screen");
         const ctx = canvas.getContext("2d");
 
         for (const el of map.elements) {
-            console.log(`🔎 ${el.kind} @ ${el.source ?? "N/A"} [wasm offset: ${el.wasm_offset}]`);
+            console.log(`🔎 ${el.kind} from ${el.source ?? "unknown"} (offset ${el.wasm_offset})`);
 
             if (el.kind === "box" && el.props) {
                 const { x, y, width, height } = el.props;
@@ -41,11 +45,6 @@ async function loadSemanticMap() {
                 ctx.strokeStyle = "red";
                 ctx.lineWidth = 2;
                 ctx.strokeRect(x, y, width, height);
-            }
-
-            if (el.kind === "group") {
-                // Optional: visualize group boundaries if desired
-                // Currently omitted since group has no props (just logical nesting)
             }
         }
     } catch (err) {
@@ -55,19 +54,25 @@ async function loadSemanticMap() {
 
 // === Entry point ===
 async function runWasm() {
-    const response = await fetch("ui.wasm");
-    const bytes = await response.arrayBuffer();
+    try {
+        const response = await fetch("ui.wasm");
+        const bytes = await response.arrayBuffer();
 
-    const module = await WebAssembly.instantiate(bytes, {
-        env: {
-            drawRect,
-            gc_alloc,
-            memory,
-        },
-    });
+        const { instance } = await WebAssembly.instantiate(bytes, {
+            env: {
+                drawRect,
+                gc_alloc,
+                memory,
+            },
+        });
 
-    module.instance.exports.run();
-    await loadSemanticMap();
+        console.log("🚀 Running WASM program...");
+        instance.exports.run();
+
+        await loadSemanticMap();
+    } catch (err) {
+        console.error("❌ Failed to run W++ WASM:", err);
+    }
 }
 
 window.onload = runWasm;

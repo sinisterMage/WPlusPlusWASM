@@ -4,7 +4,7 @@
       "kind": "box",
       "wasm_offset": 0,
       "pointer": null,
-      "source": "ui.wpp:x=20,y=30",
+      "source": "wpp:x=20,y=30",
       "props": {
         "height": 50,
         "width": 100,
@@ -16,20 +16,13 @@
       "kind": "box",
       "wasm_offset": 30,
       "pointer": null,
-      "source": "ui.wpp:x=150,y=30",
+      "source": "wpp:x=0,y=0",
       "props": {
-        "height": 60,
-        "width": 80,
-        "x": 150,
-        "y": 30
+        "height": 10,
+        "width": 10,
+        "x": 0,
+        "y": 0
       }
-    },
-    {
-      "kind": "group",
-      "wasm_offset": 0,
-      "pointer": null,
-      "source": null,
-      "props": null
     }
   ]
 }
