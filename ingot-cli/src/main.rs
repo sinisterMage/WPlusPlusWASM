@@ -8,7 +8,7 @@ use std::fs::metadata;
 use serde::Deserialize;
 
 #[derive(Parser)]
-#[command(name = "ingot")]
+#[command(name = "wingot")]
 #[command(about = "The blazing-fast CLI for W++ WASM projects 🚀", long_about = None)]
 struct Cli {
     #[command(subcommand)]
