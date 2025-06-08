@@ -42,8 +42,10 @@ module.section(&imports);
 
     // === Function Section ===
     let mut functions = FunctionSection::new();
-    let draw_ui_func_index = ADD_ROOT_FUNC + 1;
+    let imported_funcs = 5; // drawRect, gc_alloc, drawText, add_root, gc_tick
+    let draw_ui_func_index = imported_funcs as u32; // ✅ This is the first user-defined function
     functions.function(draw_ui_type as u32);
+    functions.function(gc_tick_type as u32); // This defines the type of gc_tick
     module.section(&functions);
 
     // === Export Section ===
@@ -70,6 +72,19 @@ exports.export("gc_tick", ExportKind::Func, gc_tick_func_index);
 
     draw_ui.instruction(&Instruction::End);
 codes.function(&draw_ui);
+let mut gc_tick_func = Function::new(vec![]);
+
+// Push 2 i32s onto the stack for gc_alloc
+gc_tick_func.instruction(&Instruction::I32Const(8)); // example size
+gc_tick_func.instruction(&Instruction::I32Const(TYPE_BOX)); // or TYPE_GROUP etc
+
+gc_tick_func.instruction(&Instruction::Call(GC_ALLOC_FUNC));
+gc_tick_func.instruction(&Instruction::Drop); // we don't use the pointer
+
+gc_tick_func.instruction(&Instruction::End);
+codes.function(&gc_tick_func);
+
+
 
 
 module.section(&codes);

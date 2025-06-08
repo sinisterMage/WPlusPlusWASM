@@ -1,0 +1,10 @@
+{
+  "name": "demo_project",
+  "version": "1.0.0",
+  "main": "main.wpp",
+  "jit": false,
+  "output": "ui.wasm",
+  "dependencies": {},
+  "target": "wasm",
+  "description": "A sample W++ project"
+}

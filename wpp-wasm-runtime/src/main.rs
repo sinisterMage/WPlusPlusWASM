@@ -5,6 +5,7 @@ mod gc;
 mod memory;
 
 use std::fs;
+use std::env;
 use transpile::compile_to_wasm;
 use parser::{Node, parse_wpp};
 use gc::gc_collect;
@@ -18,7 +19,11 @@ pub extern "C" fn gc_tick() {
 
 fn main() {
     // Step 1: Read W++ source file
-    let source = fs::read_to_string("ui.wpp").expect("❌ Failed to read ui.wpp");
+    let args: Vec<String> = env::args().collect();
+let filename = args.get(1).map(String::as_str).unwrap_or("ui.wpp");
+
+let source = fs::read_to_string(filename)
+    .unwrap_or_else(|_| panic!("❌ Failed to read {}", filename));
 
     // Step 2: Parse W++ source into AST
     let ast: Vec<Node> = parse_wpp(&source);
@@ -34,6 +39,6 @@ fn main() {
     println!("✅ Compilation complete: ui.wasm & ui.wpp.map.json");
 
     // Step 5: Optional GC collection pass after compile
-    gc_collect();
-    println!("🧹 GC run complete");
+    //gc_collect();
+   // println!("🧹 GC run complete");
 }

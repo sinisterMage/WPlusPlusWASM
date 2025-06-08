@@ -1,0 +1,10 @@
+{
+  "name": "my-wpp-project",
+  "version": "1.0.0",
+  "main": "main.wpp",
+    "output": "wpp.wasm",
+  "jit": false,
+  "dependencies": {},
+  "target": "wasm",
+  "description": "A sample W++ project that compiles to WebAssembly and runs in the browser."
+}
