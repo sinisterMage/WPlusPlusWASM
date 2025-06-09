@@ -126,28 +126,134 @@ fn compile_node(
     offset_counter: &mut u32,
 ) -> i32 {
     match node {
-        Node::Group(children) => {
-            let group_offset = *offset_counter;
-            let mut total_stack = 0;
+        Node::Group { direction, gap, align, justify, padding, children } => {
+    let group_offset = *offset_counter;
 
-            for child in children {
-                let stack = compile_node(child, func, map, offset_counter);
-                if stack > 0 {
-                    func.instruction(&Instruction::Drop);
-                }
-                total_stack += stack;
+    // === GC Allocation for Group ===
+    func.instruction(&Instruction::I32Const(8)); // dummy size
+    func.instruction(&Instruction::I32Const(TYPE_GROUP));
+    func.instruction(&Instruction::Call(GC_ALLOC_FUNC));
+    func.instruction(&Instruction::LocalTee(0));
+    func.instruction(&Instruction::LocalGet(0));
+    func.instruction(&Instruction::Call(ADD_ROOT_FUNC));
+    func.instruction(&Instruction::Drop); // drop return of add_root
+
+    // === Layout Pre-Pass ===
+    let is_horizontal = direction == "horizontal";
+    let mut total_main_size = 0;
+    let mut child_dims = vec![]; // (main_size, cross_size)
+
+    for child in children {
+        match child {
+            Node::Box { width, height, .. } => {
+                let main = if is_horizontal { *width } else { *height };
+                let cross = if is_horizontal { *height } else { *width };
+                total_main_size += main + gap;
+                child_dims.push((main, cross));
             }
-
-            map.push(ElementMap {
-                kind: "group".to_string(),
-                wasm_offset: group_offset,
-                pointer: None,
-                source: None,
-                props: None,
-            });
-
-            0 // Group itself doesn’t push
+            Node::Text { value, .. } => {
+                let width = value.len() as i32 * 8;
+                let height = 16;
+                let main = if is_horizontal { width } else { height };
+                let cross = if is_horizontal { height } else { width };
+                total_main_size += main + gap;
+                child_dims.push((main, cross));
+            }
+            _ => {
+                total_main_size += 50 + gap;
+                child_dims.push((50, 50));
+            }
         }
+    }
+
+    if !children.is_empty() {
+        total_main_size -= gap;
+    }
+
+    // === Justify & Align Calculations ===
+    let container_size = 300; // TODO: make dynamic later
+
+    let mut cursor_main = match justify.as_str() {
+        "start" => *padding,
+        "center" => (container_size - total_main_size) / 2,
+        "end" => container_size - total_main_size - *padding,
+        "space-between" => *padding,
+        _ => *padding,
+    };
+
+    let space_between = if justify == "space-between" && children.len() > 1 {
+        (container_size - total_main_size + gap * ((children.len() - 1) as i32)) / ((children.len() - 1) as i32)
+    } else {
+        *gap
+    };
+
+    // === Child Rendering Pass ===
+    for (i, child) in children.iter().enumerate() {
+        let (main_size, cross_size) = child_dims[i];
+
+        let (x, y) = if is_horizontal {
+            let x = cursor_main;
+            let y = match align.as_str() {
+                "start" => *padding,
+                "center" => (container_size - cross_size) / 2,
+                "end" => container_size - cross_size - *padding,
+                _ => *padding,
+            };
+            (x, y)
+        } else {
+            let x = match align.as_str() {
+                "start" => *padding,
+                "center" => (container_size - cross_size) / 2,
+                "end" => container_size - cross_size - *padding,
+                _ => *padding,
+            };
+            let y = cursor_main;
+            (x, y)
+        };
+
+        let rewritten = match child {
+            Node::Box { width, height, .. } => Node::Box {
+                x,
+                y,
+                width: *width,
+                height: *height,
+            },
+            Node::Text { value, .. } => Node::Text {
+                x,
+                y,
+                value: value.clone(),
+            },
+            _ => child.clone(), // fallback
+        };
+
+        let stack = compile_node(&rewritten, func, map, offset_counter);
+        if stack > 0 {
+            func.instruction(&Instruction::Drop);
+        }
+
+        cursor_main += main_size + space_between;
+    }
+
+    map.push(ElementMap {
+        kind: "group".to_string(),
+        wasm_offset: group_offset,
+        pointer: None,
+        source: None,
+        props: Some(json!({
+            "direction": direction,
+            "gap": gap,
+            "padding": padding,
+            "align": align,
+            "justify": justify
+        })),
+    });
+
+    0
+}
+
+
+
+
 
         Node::Box { x, y, width, height } => {
             let off = *offset_counter;

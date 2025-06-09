@@ -1,20 +1,12 @@
 group {
-  box(x: 20, y: 30, width: 100, height: 50)
-  text(x: 25, y: 40, value: "Hello, WASM!")
+  direction: "horizontal",
+  justify: "space-between",
+  align: "center",
+  padding: 10,
+  gap: 10,
 
-  if (10 > 5) {
-    box(x: 140, y: 30, width: 80, height: 40)
-    text(x: 145, y: 40, value: "This shows!")
-  } else {
-    box(x: 140, y: 80, width: 80, height: 40)
-    text(x: 145, y: 90, value: "This won't")
-  }
-
-  if (2 == 3) {
-    box(x: 240, y: 30, width: 80, height: 40)
-    text(x: 245, y: 40, value: "False!")
-  } else {
-    box(x: 240, y: 80, width: 80, height: 40)
-    text(x: 245, y: 90, value: "Fallback")
-  }
+  box(x: 0, y: 0, width: 40, height: 40)
+  text(x: 0, y: 0, value: "W++")
+  box(x: 0, y: 0, width: 60, height: 40)
 }
+

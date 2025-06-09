@@ -3,7 +3,14 @@ use std::iter::Peekable;
 
 #[derive(Debug, Clone)]
 pub enum Node {
-    Group(Vec<Node>),
+     Group {
+        direction: String,
+        gap: i32,
+        align: String,
+        justify: String,
+        padding: i32,
+        children: Vec<Node>,
+    },
     Box { x: i32, y: i32, width: i32, height: i32 },
     If { condition: Expr, then_body: Vec<Node>, else_body: Option<Vec<Node>> },
         Text { x: i32, y: i32, value: String },
@@ -220,24 +227,90 @@ impl Parser {
     self.expect(Token::Ident("group".to_string()));
     self.expect(Token::LBrace);
 
+    let mut direction = "vertical".to_string(); // default
+    let mut gap = 0;
+    let mut align = "start".to_string();
+    let mut justify = "start".to_string();
+    let mut padding = 0;
     let mut children = Vec::new();
+
     while self.peek() != Token::RBrace {
-        if let Token::Ident(ref s) = self.peek() {
-            match s.as_str() {
+        match self.peek() {
+            Token::Ident(ref s) => match s.as_str() {
+                "direction" => {
+    self.advance(); self.expect(Token::Colon);
+    if let Token::String(dir) = self.advance() {
+        direction = dir;
+    } else { panic!("Expected string for direction"); }
+
+    if self.peek() == Token::Comma {
+        self.advance(); // ✅ skip comma
+    }
+},
+
+                "gap" => {
+    self.advance(); self.expect(Token::Colon);
+    gap = self.expect_number();
+
+    if self.peek() == Token::Comma {
+        self.advance();
+    }
+},
+
+                "align" => {
+    self.advance(); self.expect(Token::Colon);
+    if let Token::String(a) = self.advance() {
+        align = a;
+    } else { panic!("Expected string for align"); }
+
+    if self.peek() == Token::Comma {
+        self.advance();
+    }
+},
+
+                "justify" => {
+    self.advance(); self.expect(Token::Colon);
+    if let Token::String(j) = self.advance() {
+        justify = j;
+    } else { panic!("Expected string for justify"); }
+
+    if self.peek() == Token::Comma {
+        self.advance();
+    }
+},
+
+                "padding" => {
+    self.advance(); self.expect(Token::Colon);
+    padding = self.expect_number();
+
+    if self.peek() == Token::Comma {
+        self.advance();
+    }
+},
+
+                // Parse child nodes
                 "box" => children.push(self.parse_box()),
                 "text" => children.push(self.parse_text()),
                 "if" => children.push(self.parse_if()),
                 "group" => children.push(self.parse_group()),
-                _ => panic!("Unexpected identifier in group: {:?}", s),
-            }
-        } else {
-            panic!("Unexpected token in group");
+                _ => panic!("Unknown property or child: {:?}", s),
+            },
+            _ => panic!("Unexpected token in group"),
         }
     }
 
     self.expect(Token::RBrace);
-    Node::Group(children)
+
+    Node::Group {
+        direction,
+        gap,
+        align,
+        justify,
+        padding,
+        children,
+    }
 }
+
 
 
     fn parse_box(&mut self) -> Node {

@@ -4,115 +4,35 @@
       "kind": "box",
       "wasm_offset": 0,
       "pointer": null,
-      "source": "wpp:x=20,y=30",
+      "source": "wpp:x=10,y=130",
       "props": {
-        "height": 50,
-        "width": 100,
-        "x": 20,
-        "y": 30
+        "height": 40,
+        "width": 40,
+        "x": 10,
+        "y": 130
       }
     },
     {
       "kind": "text",
       "wasm_offset": 38,
       "pointer": null,
-      "source": "wpp:text='Hello, WASM!'",
+      "source": "wpp:text='W++'",
       "props": {
-        "value": "Hello, WASM!",
-        "x": 25,
-        "y": 40
+        "value": "W++",
+        "x": 138,
+        "y": 142
       }
     },
     {
       "kind": "box",
-      "wasm_offset": 169,
+      "wasm_offset": 97,
       "pointer": null,
-      "source": "wpp:x=140,y=30",
+      "source": "wpp:x=250,y=130",
       "props": {
         "height": 40,
-        "width": 80,
-        "x": 140,
-        "y": 30
-      }
-    },
-    {
-      "kind": "text",
-      "wasm_offset": 207,
-      "pointer": null,
-      "source": "wpp:text='This shows!'",
-      "props": {
-        "value": "This shows!",
-        "x": 145,
-        "y": 40
-      }
-    },
-    {
-      "kind": "box",
-      "wasm_offset": 330,
-      "pointer": null,
-      "source": "wpp:x=140,y=80",
-      "props": {
-        "height": 40,
-        "width": 80,
-        "x": 140,
-        "y": 80
-      }
-    },
-    {
-      "kind": "text",
-      "wasm_offset": 368,
-      "pointer": null,
-      "source": "wpp:text='This won't'",
-      "props": {
-        "value": "This won't",
-        "x": 145,
-        "y": 90
-      }
-    },
-    {
-      "kind": "box",
-      "wasm_offset": 483,
-      "pointer": null,
-      "source": "wpp:x=240,y=30",
-      "props": {
-        "height": 40,
-        "width": 80,
-        "x": 240,
-        "y": 30
-      }
-    },
-    {
-      "kind": "text",
-      "wasm_offset": 521,
-      "pointer": null,
-      "source": "wpp:text='False!'",
-      "props": {
-        "value": "False!",
-        "x": 245,
-        "y": 40
-      }
-    },
-    {
-      "kind": "box",
-      "wasm_offset": 604,
-      "pointer": null,
-      "source": "wpp:x=240,y=80",
-      "props": {
-        "height": 40,
-        "width": 80,
-        "x": 240,
-        "y": 80
-      }
-    },
-    {
-      "kind": "text",
-      "wasm_offset": 642,
-      "pointer": null,
-      "source": "wpp:text='Fallback'",
-      "props": {
-        "value": "Fallback",
-        "x": 245,
-        "y": 90
+        "width": 60,
+        "x": 250,
+        "y": 130
       }
     },
     {
@@ -120,7 +40,13 @@
       "wasm_offset": 0,
       "pointer": null,
       "source": null,
-      "props": null
+      "props": {
+        "align": "center",
+        "direction": "horizontal",
+        "gap": 10,
+        "justify": "space-between",
+        "padding": 10
+      }
     }
   ]
 }
