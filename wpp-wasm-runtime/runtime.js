@@ -1,9 +1,9 @@
 const memory = new WebAssembly.Memory({ initial: 1 }); // 64KB
 let heap = new Uint8Array(memory.buffer);
-let nextAlloc = 1024; // start after null zone
+let nextAlloc = 1024;
 
-const HEADER_SIZE = 8; // 4 bytes type + 4 bytes mark
-const roots = []; // JS-side root registry (simplified)
+const HEADER_SIZE = 8;
+const roots = [];
 
 // === GC bump allocator ===
 function gc_alloc(size, type_id) {
@@ -11,17 +11,15 @@ function gc_alloc(size, type_id) {
     const base = nextAlloc;
 
     if (base + total > heap.length) {
-        console.warn(`⚠️ Out of memory at 0x${base.toString(16)}. Trigger GC here if needed.`);
+        console.warn(`⚠️ Out of memory at 0x${base.toString(16)}.`);
         return 0;
     }
 
-    // Write type_id
     heap[base + 0] = type_id & 0xff;
     heap[base + 1] = (type_id >> 8) & 0xff;
     heap[base + 2] = (type_id >> 16) & 0xff;
     heap[base + 3] = (type_id >> 24) & 0xff;
 
-    // Write mark = 1 (live)
     heap[base + 4] = 1;
     heap[base + 5] = 0;
     heap[base + 6] = 0;
@@ -34,30 +32,24 @@ function gc_alloc(size, type_id) {
     return ptr;
 }
 
-// === GC root registration ===
 function add_root(ptr) {
     roots.push(ptr);
     console.log(`🌱 Rooted ptr=0x${ptr.toString(16)}`);
 }
 
-// === GC trigger (stub for now) ===
 function gc_collect() {
     if (typeof instance !== "undefined") {
-        instance.exports.gc_tick(); // calls Rust-side mark-and-sweep
+        instance.exports.gc_tick();
         console.log("🧹 GC triggered from JS → WASM");
     } else {
         console.warn("⚠️ Cannot call GC, WASM instance not ready");
     }
 }
 
-
 // === Canvas draw hooks ===
 function drawRect(x, y, w, h) {
     const canvas = document.getElementById("screen");
-    if (!canvas) {
-        console.warn("⚠️ Canvas element #screen not found.");
-        return;
-    }
+    if (!canvas) return;
 
     const ctx = canvas.getContext("2d");
     ctx.fillStyle = "blue";
@@ -68,23 +60,26 @@ function drawRect(x, y, w, h) {
 
 function drawText(x, y, ptr, len) {
     const canvas = document.getElementById("screen");
-    if (!canvas) {
-        console.warn("⚠️ Canvas element #screen not found.");
-        return;
-    }
+    if (!canvas) return;
 
     const ctx = canvas.getContext("2d");
-    ctx.fillStyle = "white";
-    ctx.font = "16px sans-serif";
-
     const bytes = heap.subarray(ptr, ptr + len);
     const text = new TextDecoder("utf-8").decode(bytes);
 
-    ctx.fillText(text, x, y);
-    console.log(`🔤 drawText(${x}, ${y}, "${text}")`);
+    ctx.fillStyle = "white";
+    ctx.font = "16px sans-serif";
+    ctx.textBaseline = "top";
+
+    // Center vertically using actual text metrics
+    const metrics = ctx.measureText(text);
+    const baselineOffset = metrics.actualBoundingBoxAscent / 2;
+    ctx.textBaseline = "middle";
+
+    ctx.fillText(text, x, y + baselineOffset);
+    console.log(`🔤 drawText(${x}, ${y + baselineOffset}, "${text}")`);
 }
 
-// === Optional Semantic Overlay ===
+// === Semantic Overlay ===
 async function loadSemanticMap() {
     try {
         const res = await fetch("ui.wpp.map.json?cachebust=" + Date.now());
@@ -115,14 +110,14 @@ async function loadSemanticMap() {
     }
 }
 
-// === Entry point ===
+// === Entry Point ===
 async function runWasm() {
     try {
         const wasmUrl = "ui.wasm?cachebust=" + Date.now();
         const response = await fetch(wasmUrl);
         const bytes = await response.arrayBuffer();
 
-        const { instance } = await WebAssembly.instantiate(bytes, {
+        const { instance: wasmInstance } = await WebAssembly.instantiate(bytes, {
             env: {
                 memory,
                 drawRect,
@@ -134,10 +129,11 @@ async function runWasm() {
             },
         });
 
+        window.instance = wasmInstance;
         heap = new Uint8Array(memory.buffer);
 
         console.log("🚀 Running WASM program...");
-        instance.exports.run();
+        wasmInstance.exports.run();
 
         await loadSemanticMap();
     } catch (err) {

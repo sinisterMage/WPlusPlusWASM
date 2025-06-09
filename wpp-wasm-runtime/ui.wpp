@@ -1,12 +1,4 @@
-group {
-  direction: "horizontal",
-  justify: "space-between",
-  align: "center",
-  padding: 10,
-  gap: 10,
-
-  box(x: 0, y: 0, width: 40, height: 40)
-  text(x: 0, y: 0, value: "W++")
-  box(x: 0, y: 0, width: 60, height: 40)
-}
-
+let a = 5
+let b = 3
+let c = a + b
+let d = c * 2

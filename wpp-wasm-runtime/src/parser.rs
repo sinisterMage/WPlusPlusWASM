@@ -2,8 +2,9 @@ use std::str::Chars;
 use std::iter::Peekable;
 
 #[derive(Debug, Clone)]
+
 pub enum Node {
-     Group {
+    Group {
         direction: String,
         gap: i32,
         align: String,
@@ -11,23 +12,54 @@ pub enum Node {
         padding: i32,
         children: Vec<Node>,
     },
-    Box { x: i32, y: i32, width: i32, height: i32 },
-    If { condition: Expr, then_body: Vec<Node>, else_body: Option<Vec<Node>> },
-        Text { x: i32, y: i32, value: String },
+    Box {
+        x: i32,
+        y: i32,
+        width: i32,
+        height: i32,
+    },
+    If {
+        condition: Expr,
+        then_body: Vec<Node>,
+        else_body: Option<Vec<Node>>,
+    },
+    Text {
+        x: i32,
+        y: i32,
+        value: String,
+    },
+    List {
+        direction: String,
+        gap: i32,
+        padding: i32,
+        items: Vec<Node>,
+    },
+    Item {
+        value: String,
+    },
     Print(String),
     Expr(Expr),
-    
+    Let {
+    name: String,
+    value: Expr,
 }
+
+}
+
+
 
 #[derive(Debug, Clone)]
 pub enum Expr {
     Literal(i32),
+    Identifier(String), // For referencing layout values
+    Layout(Box<Node>),  // Group, List, etc. as expressions
     Binary {
         left: Box<Expr>,
         op: String,
         right: Box<Expr>,
     },
 }
+
 
 
 
@@ -204,23 +236,29 @@ impl Parser {
     let mut nodes = Vec::new();
     while self.pos < self.tokens.len() {
         match self.peek() {
-            Token::Ident(ref s) => match s.as_str() {
-                "box" => nodes.push(self.parse_box()),
-                "group" => nodes.push(self.parse_group()),
-                "if" => nodes.push(self.parse_if()),
-                "text" => nodes.push(self.parse_text()),
-                _ => panic!("Unexpected identifier '{}'", s),
-            },
-            Token::Number(_) | Token::LParen => {
-                // ✅ Top-level expression
-                let expr = self.parse_expr();
-                nodes.push(Node::Expr(expr));
-            }
-            _ => break,
+    Token::Ident(ref s) => match s.as_str() {
+        "box" => nodes.push(self.parse_box()),
+        "group" => nodes.push(self.parse_group()),
+        "if" => nodes.push(self.parse_if()),
+        "text" => nodes.push(self.parse_text()),
+        "list" => nodes.push(self.parse_list()),
+        "let" => nodes.push(self.parse_let()),
+        _ => {
+            let expr = self.parse_expr(); // allow regular identifiers
+            nodes.push(Node::Expr(expr));
         }
+    },
+    Token::Number(_) | Token::LParen => {
+        let expr = self.parse_expr();
+        nodes.push(Node::Expr(expr));
+    }
+    _ => break,
+}
+
     }
     nodes
 }
+
 
 
     fn parse_group(&mut self) -> Node {
@@ -309,6 +347,20 @@ impl Parser {
         padding,
         children,
     }
+}
+fn parse_let(&mut self) -> Node {
+    self.expect_ident("let");
+
+    let name = match self.advance() {
+        Token::Ident(s) => s,
+        t => panic!("Expected identifier name, got {:?}", t),
+    };
+
+    self.expect(Token::Operator("=".to_string()));
+
+    let value = self.parse_expr();
+
+    Node::Let { name, value }
 }
 
 
@@ -414,6 +466,84 @@ fn parse_text(&mut self) -> Node {
         value: value.expect("Missing value"),
     }
 }
+fn parse_list(&mut self) -> Node {
+    self.expect_ident("list");
+    self.expect(Token::LParen);
+
+    let mut direction = "vertical".to_string();
+    let mut gap = 0;
+    let mut padding = 0;
+
+    while self.peek() != Token::RParen {
+        match self.advance() {
+            Token::Ident(name) => {
+                self.expect(Token::Colon);
+                match name.as_str() {
+                    "direction" => {
+                        if let Token::String(s) = self.advance() {
+                            direction = s;
+                        } else {
+                            panic!("Expected string for direction");
+                        }
+                    }
+                    "gap" => gap = self.expect_number(),
+                    "padding" => padding = self.expect_number(),
+                    _ => panic!("Unexpected list param '{}'", name),
+                }
+                if self.peek() == Token::Comma {
+                    self.advance();
+                }
+            }
+            _ => panic!("Invalid token in list params"),
+        }
+    }
+    self.expect(Token::RParen);
+    self.expect(Token::LBrace);
+
+    let mut items = vec![];
+    while self.peek() != Token::RBrace {
+        items.push(self.parse_item());
+    }
+    self.expect(Token::RBrace);
+
+    Node::List {
+        direction,
+        gap,
+        padding,
+        items,
+    }
+}
+
+fn parse_item(&mut self) -> Node {
+    self.expect_ident("item");
+    self.expect(Token::LParen);
+
+    let mut value = None;
+
+    while self.peek() != Token::RParen {
+        match self.advance() {
+            Token::Ident(name) if name == "value" => {
+                self.expect(Token::Colon);
+                if let Token::String(s) = self.advance() {
+                    value = Some(s);
+                } else {
+                    panic!("Expected string for item value");
+                }
+
+                if self.peek() == Token::Comma {
+                    self.advance();
+                }
+            }
+            _ => panic!("Unexpected token in item"),
+        }
+    }
+
+    self.expect(Token::RParen);
+
+    Node::Item {
+        value: value.expect("Missing value in item"),
+    }
+}
 
 
 
@@ -491,16 +621,33 @@ fn parse_expr(&mut self) -> Expr {
 }
 
 fn parse_primary(&mut self) -> Expr {
-    match self.advance() {
-        Token::Number(n) => Expr::Literal(n),
+    match self.peek() {
+        Token::Number(n) => {
+            self.advance();
+            Expr::Literal(n)
+        },
         Token::LParen => {
+            self.advance();
             let expr = self.parse_expr();
             self.expect(Token::RParen);
             expr
-        }
+        },
+        Token::Ident(ref s) if s == "group" => {
+            let node = self.parse_group();
+            Expr::Layout(Box::new(node))
+        },
+        Token::Ident(ref s) if s == "list" => {
+            let node = self.parse_list();
+            Expr::Layout(Box::new(node))
+        },
+        Token::Ident(ref s) => {
+            self.advance();
+            Expr::Identifier(s.clone())
+        },
         t => panic!("Unexpected token in primary expression: {:?}", t),
     }
 }
+
 
 
 

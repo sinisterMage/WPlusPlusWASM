@@ -2,6 +2,8 @@ use wasm_encoder::*;
 use crate::parser::{Node, Expr};
 use crate::map::{ElementMap, SemanticMap};
 use serde_json::json;
+use std::collections::HashMap;
+
 
 const DRAW_RECT_FUNC: u32 = 0;
 const GC_ALLOC_FUNC: u32 = 1;
@@ -18,77 +20,89 @@ pub fn compile_to_wasm(ast: &[Node]) -> (Vec<u8>, String) {
     // === Type Section ===
     let mut types = TypeSection::new();
     let draw_ui_type = types.len(); types.function([], []);
-let draw_rect_type = types.len(); types.function([ValType::I32; 4], []);
-let gc_alloc_type = types.len(); types.function([ValType::I32; 2], [ValType::I32]); // fixed!
-let draw_text_type = types.len(); types.function([ValType::I32; 4], []);
-let add_root_type = types.len(); types.function([ValType::I32], []);
-let gc_tick_type = types.len(); types.function([], []);
-module.section(&types);
+    let draw_rect_type = types.len(); types.function([ValType::I32; 4], []);
+    let gc_alloc_type = types.len(); types.function([ValType::I32; 2], [ValType::I32]);
+    let draw_text_type = types.len(); types.function([ValType::I32; 4], []);
+    let add_root_type = types.len(); types.function([ValType::I32], []);
+    let gc_tick_type = types.len(); types.function([], []);
+    module.section(&types);
 
-let mut imports = ImportSection::new();
-imports.import("env", "memory", EntityType::Memory(MemoryType {
-    minimum: 1,
-    maximum: None,
-    memory64: false, 
-    shared: false,
-}));
-imports.import("env", "drawRect", EntityType::Function(draw_rect_type as u32));
-imports.import("env", "gc_alloc", EntityType::Function(gc_alloc_type as u32));
-imports.import("env", "drawText", EntityType::Function(draw_text_type as u32));
-imports.import("env", "add_root", EntityType::Function(add_root_type as u32));
-imports.import("env", "gc_tick", EntityType::Function(gc_tick_type as u32)); // new hook!
-module.section(&imports);
-
+    // === Import Section ===
+    let mut imports = ImportSection::new();
+    imports.import("env", "memory", EntityType::Memory(MemoryType {
+        minimum: 1,
+        maximum: None,
+        memory64: false,
+        shared: false,
+    }));
+    imports.import("env", "drawRect", EntityType::Function(draw_rect_type as u32));
+    imports.import("env", "gc_alloc", EntityType::Function(gc_alloc_type as u32));
+    imports.import("env", "drawText", EntityType::Function(draw_text_type as u32));
+    imports.import("env", "add_root", EntityType::Function(add_root_type as u32));
+    imports.import("env", "gc_tick", EntityType::Function(gc_tick_type as u32));
+    module.section(&imports);
 
     // === Function Section ===
     let mut functions = FunctionSection::new();
-    let imported_funcs = 5; // drawRect, gc_alloc, drawText, add_root, gc_tick
-    let draw_ui_func_index = imported_funcs as u32; // ✅ This is the first user-defined function
+    let imported_funcs = 5;
+    let draw_ui_func_index = imported_funcs as u32;
     functions.function(draw_ui_type as u32);
-    functions.function(gc_tick_type as u32); // This defines the type of gc_tick
+    functions.function(gc_tick_type as u32);
     module.section(&functions);
 
     // === Export Section ===
     let mut exports = ExportSection::new();
     exports.export("run", ExportKind::Func, draw_ui_func_index);
-    let gc_tick_func_index = draw_ui_func_index + 1; // assuming it's the next function
-exports.export("gc_tick", ExportKind::Func, gc_tick_func_index);
-
+    exports.export("gc_tick", ExportKind::Func, draw_ui_func_index + 1);
     module.section(&exports);
 
     // === Code Section ===
     let mut codes = CodeSection::new();
-    let mut draw_ui = Function::new(vec![(1, ValType::I32)]); // local 0 = temp ptr
+
+    // === Collect locals & instructions ===
+    let mut wasm_locals: Vec<(u32, ValType)> = vec![(1, ValType::I32)]; // temp ptr local 0
+    let mut local_map: HashMap<String, u32> = HashMap::new();           // name → index
+    let mut instructions = vec![];
+
     let mut map = vec![];
     let mut offset = 0u32;
 
     println!("📦 Compiling AST:\n{:#?}", ast);
     for node in ast {
-    let stack = compile_node(node, &mut draw_ui, &mut map, &mut offset);
-    if stack > 0 {
-        draw_ui.instruction(&Instruction::Drop);
+        let stack = crate::transpile::compile_node(
+            node,
+            &mut instructions,
+            &mut map,
+            &mut offset,
+            &mut local_map,
+            &mut wasm_locals,
+        );
+
+        if stack > 0 {
+            instructions.push(Instruction::Drop);
+        }
     }
-}
 
-    draw_ui.instruction(&Instruction::End);
-codes.function(&draw_ui);
-let mut gc_tick_func = Function::new(vec![]);
+    instructions.push(Instruction::End);
 
-// Push 2 i32s onto the stack for gc_alloc
-gc_tick_func.instruction(&Instruction::I32Const(8)); // example size
-gc_tick_func.instruction(&Instruction::I32Const(TYPE_BOX)); // or TYPE_GROUP etc
+    // Now we have the full wasm_locals and instructions, so we can build the Function
+    let mut draw_ui = Function::new(wasm_locals.clone());
+    for instr in instructions {
+        draw_ui.instruction(&instr);
+    }
 
-gc_tick_func.instruction(&Instruction::Call(GC_ALLOC_FUNC));
-gc_tick_func.instruction(&Instruction::Drop); // we don't use the pointer
+    codes.function(&draw_ui);
 
-gc_tick_func.instruction(&Instruction::End);
-codes.function(&gc_tick_func);
+    // === GC Tick Stub ===
+    let mut gc_tick_func = Function::new(vec![]);
+    gc_tick_func.instruction(&Instruction::I32Const(8));
+    gc_tick_func.instruction(&Instruction::I32Const(TYPE_BOX));
+    gc_tick_func.instruction(&Instruction::Call(GC_ALLOC_FUNC));
+    gc_tick_func.instruction(&Instruction::Drop);
+    gc_tick_func.instruction(&Instruction::End);
+    codes.function(&gc_tick_func);
 
-
-
-
-module.section(&codes);
-
+    module.section(&codes);
 
     let wasm = module.finish();
     let semantic = SemanticMap { elements: map };
@@ -96,47 +110,101 @@ module.section(&codes);
 
     (wasm, map_json)
 }
-fn compile_expr(expr: &Expr, func: &mut Function) {
+
+fn compile_expr(expr: &Expr, instructions: &mut Vec<Instruction>, locals: &HashMap<String, u32>) {
     match expr {
         Expr::Literal(n) => {
-            func.instruction(&Instruction::I32Const(*n));
+            instructions.push(Instruction::I32Const(*n));
         }
+
+        Expr::Identifier(name) => {
+            if let Some(&index) = locals.get(name) {
+                instructions.push(Instruction::LocalGet(index));
+            } else {
+                panic!("❌ Undefined variable: {}", name);
+            }
+        }
+
         Expr::Binary { left, op, right } => {
-            compile_expr(left, func);
-            compile_expr(right, func);
-            match op.as_str() {
-                ">" => func.instruction(&Instruction::I32GtS),
-                "<" => func.instruction(&Instruction::I32LtS),
-                "==" => func.instruction(&Instruction::I32Eq),
-                _ => panic!("Unsupported binary op: {}", op),
+            compile_expr(left, instructions, locals);
+            compile_expr(right, instructions, locals);
+            let op_instr = match op.as_str() {
+                "+" => Instruction::I32Add,
+                "-" => Instruction::I32Sub,
+                "*" => Instruction::I32Mul,
+                "/" => Instruction::I32DivS,
+                "==" => Instruction::I32Eq,
+                ">" => Instruction::I32GtS,
+                "<" => Instruction::I32LtS,
+                _ => panic!("❌ Unsupported binary operator: {}", op),
             };
+            instructions.push(op_instr);
+        }
+
+        Expr::Layout(inner_node) => {
+            let mut dummy_map = vec![];
+            let mut dummy_offset = 0;
+            let mut dummy_map2 = HashMap::new();
+            let mut dummy_layouts = vec![(1, ValType::I32)];
+
+            let _ = compile_node(
+                inner_node,
+                instructions,
+                &mut dummy_map,
+                &mut dummy_offset,
+                &mut dummy_map2,
+                &mut dummy_layouts,
+            );
         }
     }
 }
 
-fn compile_expr_and_discard(expr: &Expr, func: &mut Function) {
-    compile_expr(expr, func);
-    func.instruction(&Instruction::Drop);
+
+fn compile_expr_and_discard(expr: &Expr, instructions: &mut Vec<Instruction>, locals: &HashMap<String, u32>) {
+    compile_expr(expr, instructions, locals);
+    instructions.push(Instruction::Drop);
 }
+
+
 
 fn compile_node(
     node: &Node,
-    func: &mut Function,
+    instructions: &mut Vec<Instruction>,
     map: &mut Vec<ElementMap>,
     offset_counter: &mut u32,
-) -> i32 {
+    local_map: &mut HashMap<String, u32>,
+    wasm_locals: &mut Vec<(u32, ValType)>, // ✅ Add this
+) -> i32
+
+
+{
     match node {
+        Node::Let { name, value } => {
+    compile_expr(value, instructions, &*local_map);
+ // value pushed on stack
+
+    let local_index = wasm_locals.len() as u32;
+    local_map.insert(name.clone(), local_index);      // symbol → local
+    wasm_locals.push((1, ValType::I32));              // add to final locals list
+
+    instructions.push(Instruction::LocalSet(local_index)); // assign to local
+
+    0
+}
+
+
         Node::Group { direction, gap, align, justify, padding, children } => {
     let group_offset = *offset_counter;
 
     // === GC Allocation for Group ===
-    func.instruction(&Instruction::I32Const(8)); // dummy size
-    func.instruction(&Instruction::I32Const(TYPE_GROUP));
-    func.instruction(&Instruction::Call(GC_ALLOC_FUNC));
-    func.instruction(&Instruction::LocalTee(0));
-    func.instruction(&Instruction::LocalGet(0));
-    func.instruction(&Instruction::Call(ADD_ROOT_FUNC));
-    func.instruction(&Instruction::Drop); // drop return of add_root
+    instructions.push(Instruction::I32Const(8));
+instructions.push(Instruction::I32Const(TYPE_GROUP));
+instructions.push(Instruction::Call(GC_ALLOC_FUNC));
+instructions.push(Instruction::LocalTee(0));
+instructions.push(Instruction::LocalGet(0));
+instructions.push(Instruction::Call(ADD_ROOT_FUNC));
+instructions.push(Instruction::Drop);
+
 
     // === Layout Pre-Pass ===
     let is_horizontal = direction == "horizontal";
@@ -226,9 +294,18 @@ fn compile_node(
             _ => child.clone(), // fallback
         };
 
-        let stack = compile_node(&rewritten, func, map, offset_counter);
+        let stack = compile_node(
+    &rewritten,
+    instructions,
+    map,
+    offset_counter,
+    local_map,
+    wasm_locals,
+);
+
+
         if stack > 0 {
-            func.instruction(&Instruction::Drop);
+            instructions.push(Instruction::Drop);
         }
 
         cursor_main += main_size + space_between;
@@ -258,20 +335,21 @@ fn compile_node(
         Node::Box { x, y, width, height } => {
             let off = *offset_counter;
 
-            func.instruction(&Instruction::I32Const(0)); *offset_counter += 5; // dummy size
-            func.instruction(&Instruction::I32Const(TYPE_BOX)); *offset_counter += 5;
-            func.instruction(&Instruction::Call(GC_ALLOC_FUNC)); *offset_counter += 2;
-            func.instruction(&Instruction::LocalTee(0)); *offset_counter += 2;
+           instructions.push(Instruction::I32Const(0)); *offset_counter += 5; // dummy size
+instructions.push(Instruction::I32Const(TYPE_BOX)); *offset_counter += 5;
+instructions.push(Instruction::Call(GC_ALLOC_FUNC)); *offset_counter += 2;
+instructions.push(Instruction::LocalTee(0)); *offset_counter += 2;
 
-            func.instruction(&Instruction::LocalGet(0));
-            func.instruction(&Instruction::Call(ADD_ROOT_FUNC)); *offset_counter += 2;
-            func.instruction(&Instruction::Drop);
+instructions.push(Instruction::LocalGet(0));
+instructions.push(Instruction::Call(ADD_ROOT_FUNC)); *offset_counter += 2;
+instructions.push(Instruction::Drop);
 
-            func.instruction(&Instruction::I32Const(*x)); *offset_counter += 5;
-            func.instruction(&Instruction::I32Const(*y)); *offset_counter += 5;
-            func.instruction(&Instruction::I32Const(*width)); *offset_counter += 5;
-            func.instruction(&Instruction::I32Const(*height)); *offset_counter += 5;
-            func.instruction(&Instruction::Call(DRAW_RECT_FUNC)); *offset_counter += 2;
+instructions.push(Instruction::I32Const(*x)); *offset_counter += 5;
+instructions.push(Instruction::I32Const(*y)); *offset_counter += 5;
+instructions.push(Instruction::I32Const(*width)); *offset_counter += 5;
+instructions.push(Instruction::I32Const(*height)); *offset_counter += 5;
+instructions.push(Instruction::Call(DRAW_RECT_FUNC)); *offset_counter += 2;
+
 
             map.push(ElementMap {
                 kind: "box".to_string(),
@@ -288,33 +366,36 @@ fn compile_node(
             let off = *offset_counter;
             let len = value.len() as i32;
 
-            func.instruction(&Instruction::I32Const(len)); *offset_counter += 5;
-            func.instruction(&Instruction::I32Const(TYPE_TEXT)); *offset_counter += 5;
-            func.instruction(&Instruction::Call(GC_ALLOC_FUNC)); *offset_counter += 2;
-            func.instruction(&Instruction::LocalTee(0)); *offset_counter += 2;
+            instructions.push(Instruction::I32Const(len)); *offset_counter += 5;
+instructions.push(Instruction::I32Const(TYPE_TEXT)); *offset_counter += 5;
+instructions.push(Instruction::Call(GC_ALLOC_FUNC)); *offset_counter += 2;
+instructions.push(Instruction::LocalTee(0)); *offset_counter += 2;
 
-            func.instruction(&Instruction::LocalGet(0));
-            func.instruction(&Instruction::Call(ADD_ROOT_FUNC)); *offset_counter += 2;
-            func.instruction(&Instruction::Drop);
+instructions.push(Instruction::LocalGet(0));
+instructions.push(Instruction::Call(ADD_ROOT_FUNC)); *offset_counter += 2;
+instructions.push(Instruction::Drop);
+
 
             for (i, byte) in value.bytes().enumerate() {
-                func.instruction(&Instruction::LocalGet(0));
-                func.instruction(&Instruction::I32Const(i as i32));
-                func.instruction(&Instruction::I32Add);
-                func.instruction(&Instruction::I32Const(byte as i32));
-                func.instruction(&Instruction::I32Store8(MemArg {
-                    align: 0,
-                    offset: 0,
-                    memory_index: 0,
-                }));
-                *offset_counter += 8;
+                instructions.push(Instruction::LocalGet(0));
+instructions.push(Instruction::I32Const(i as i32));
+instructions.push(Instruction::I32Add);
+instructions.push(Instruction::I32Const(byte as i32));
+instructions.push(Instruction::I32Store8(MemArg {
+    align: 0,
+    offset: 0,
+    memory_index: 0,
+}));
+*offset_counter += 8;
+
             }
 
-            func.instruction(&Instruction::I32Const(*x)); *offset_counter += 5;
-            func.instruction(&Instruction::I32Const(*y)); *offset_counter += 5;
-            func.instruction(&Instruction::LocalGet(0)); *offset_counter += 2;
-            func.instruction(&Instruction::I32Const(len)); *offset_counter += 5;
-            func.instruction(&Instruction::Call(DRAW_TEXT_FUNC)); *offset_counter += 2;
+            instructions.push(Instruction::I32Const(*x)); *offset_counter += 5;
+instructions.push(Instruction::I32Const(*y)); *offset_counter += 5;
+instructions.push(Instruction::LocalGet(0)); *offset_counter += 2;
+instructions.push(Instruction::I32Const(len)); *offset_counter += 5;
+instructions.push(Instruction::Call(DRAW_TEXT_FUNC)); *offset_counter += 2;
+
 
             map.push(ElementMap {
                 kind: "text".to_string(),
@@ -326,33 +407,83 @@ fn compile_node(
 
             0 // pushes ptr (but we drop it later)
         }
+        Node::List { direction, gap, padding, items } => {
+    let is_horizontal = direction == "horizontal";
+    let mut cursor = *padding;
+
+    for item in items {
+        if let Node::Item { value } = item {
+            let width = value.len() as i32 * 8;
+            let height = 16;
+
+            let (x, y) = if is_horizontal {
+                (cursor, *padding)
+            } else {
+                (*padding, cursor)
+            };
+
+            let rewritten = Node::Text {
+                x,
+                y,
+                value: value.clone(),
+            };
+
+            let stack = compile_node(&rewritten, instructions, map, offset_counter, local_map, wasm_locals);
+
+
+            if stack > 0 {
+                instructions.push(Instruction::Drop);
+            }
+
+            cursor += if is_horizontal { width } else { height } + gap;
+        }
+    }
+
+    map.push(ElementMap {
+        kind: "list".to_string(),
+        wasm_offset: *offset_counter,
+        pointer: None,
+        source: None,
+        props: Some(json!({
+            "direction": direction,
+            "gap": gap,
+            "padding": padding
+        })),
+    });
+
+    0
+}
+
 
         Node::Expr(e) => {
-            compile_expr_and_discard(e, func);
-            0
-        }
+    compile_expr_and_discard(e, instructions, local_map);
+    0
+}
+
 
         Node::If { condition, then_body, else_body } => {
-    compile_expr(condition, func);
-    func.instruction(&Instruction::If(BlockType::Empty));
+    
+    instructions.push(Instruction::If(BlockType::Empty));
 
     let mut max_stack = 0;
 
     for stmt in then_body {
-        max_stack = max_stack.max(compile_node(stmt, func, map, offset_counter));
-    }
+    max_stack = max_stack.max(compile_node(stmt, instructions, map, offset_counter, local_map, wasm_locals)
+);
+}
 
-    if let Some(else_branch) = else_body {
-        func.instruction(&Instruction::Else);
-        for stmt in else_branch {
-            max_stack = max_stack.max(compile_node(stmt, func, map, offset_counter));
-        }
+if let Some(else_branch) = else_body {
+    instructions.push(Instruction::Else);
+    for stmt in else_branch {
+        max_stack = max_stack.max(compile_node(stmt, instructions, map, offset_counter, local_map, wasm_locals)
+);
     }
+}
 
-    func.instruction(&Instruction::End);
+    instructions.push(Instruction::End);
 
     if max_stack > 0 {
-        func.instruction(&Instruction::Drop);
+        instructions.push(Instruction::Drop);
     }
 
     0
