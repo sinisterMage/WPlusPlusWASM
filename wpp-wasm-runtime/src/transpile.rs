@@ -141,16 +141,20 @@ for node in ast {
     if !matches!(node, Node::Function { .. }) {
         println!("🔵 [compile_to_wasm] Compiling top-level node: {:?}", node);
 
-        let mut  stack = crate::transpile::compile_node(
-            node,
-            &mut instructions,
-            &mut map,
-            &mut offset,
-            &mut local_map,
-            &mut wasm_locals,
-            &function_indices,
-            &mut stack_counter,
-        );
+       let mut stack: i32;
+{
+    stack = crate::transpile::compile_node(
+        node,
+        &mut instructions,
+        &mut map,
+        &mut offset,
+        &mut local_map,
+        &mut wasm_locals,
+        &function_indices,
+        &mut stack_counter,
+    );
+}
+
 
         println!("🟢 [compile_to_wasm] Stack returned = {}", stack);
 
@@ -251,7 +255,9 @@ for (sig, node) in ordered_sigs {
 
 for stmt in body {
     println!("   🔸 [stmt] Compiling statement in {:?}: {:?}", sig.name, stmt);
-    let stack = crate::transpile::compile_node(
+   let stack: i32;
+{
+    stack = crate::transpile::compile_node(
         stmt,
         &mut body_instrs,
         &mut dummy_map,
@@ -261,6 +267,8 @@ for stmt in body {
         &function_indices,
         &mut stack_counter,
     );
+}
+
 
     println!("   📏 Stack returned by stmt = {}", stack);
 
@@ -396,17 +404,20 @@ pub fn compile_expr(
             let mut dummy_locals = HashMap::new();
             let mut dummy_layouts = vec![(1, ValType::I32)];
 println!("   ↳ Compiling embedded layout node");
+{
+    let _ = crate::transpile::compile_node(
+    inner_node,
+    instructions,
+    &mut dummy_map,
+    &mut dummy_offset,
+    &mut dummy_locals,
+    &mut dummy_layouts,
+    function_indices,
+    stack_counter,
+);
 
-            let _ = compile_node(
-                inner_node,
-                instructions,
-                &mut dummy_map,
-                &mut dummy_offset,
-                &mut dummy_locals,
-                &mut dummy_layouts,
-                function_indices,
-                &mut stack_counter,
-            );
+}
+
 
             0
         }
