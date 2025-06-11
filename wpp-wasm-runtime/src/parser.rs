@@ -12,6 +12,7 @@ pub enum Node {
         padding: i32,
         children: Vec<Node>,
     },
+    
     Box {
         x: i32,
         y: i32,
@@ -23,11 +24,8 @@ pub enum Node {
         then_body: Vec<Node>,
         else_body: Option<Vec<Node>>,
     },
-    Text {
-        x: i32,
-        y: i32,
-        value: String,
-    },
+        Text { x: i32, y: i32, value: Expr },
+
     List {
         direction: String,
         gap: i32,
@@ -42,7 +40,13 @@ pub enum Node {
     Let {
     name: String,
     value: Expr,
+},
+Function {
+    name: String,
+    params: Vec<(String, String)>, // (name, type)
+    body: Vec<Node>,
 }
+
 
 }
 
@@ -58,6 +62,12 @@ pub enum Expr {
         op: String,
         right: Box<Expr>,
     },
+    Call {
+    name: String,
+    args: Vec<Expr>,
+},
+StringLiteral(String),
+
 }
 
 
@@ -239,6 +249,7 @@ impl Parser {
     Token::Ident(ref s) => match s.as_str() {
         "box" => nodes.push(self.parse_box()),
         "group" => nodes.push(self.parse_group()),
+        "func" => nodes.push(self.parse_function()),
         "if" => nodes.push(self.parse_if()),
         "text" => nodes.push(self.parse_text()),
         "list" => nodes.push(self.parse_list()),
@@ -257,6 +268,49 @@ impl Parser {
 
     }
     nodes
+}
+fn parse_function(&mut self) -> Node {
+    self.expect_ident("func");
+
+    let name = match self.advance() {
+        Token::Ident(s) => s,
+        t => panic!("Expected function name, got {:?}", t),
+    };
+
+    self.expect(Token::LParen);
+    let mut params = vec![];
+
+    while self.peek() != Token::RParen {
+        let pname = match self.advance() {
+            Token::Ident(s) => s,
+            t => panic!("Expected param name, got {:?}", t),
+        };
+
+        self.expect(Token::Colon);
+
+        let ptype = match self.advance() {
+            Token::Ident(s) => s,
+            t => panic!("Expected param type, got {:?}", t),
+        };
+
+        params.push((pname, ptype));
+
+        if self.peek() == Token::Comma {
+            self.advance();
+        }
+    }
+
+    self.expect(Token::RParen);
+    self.expect(Token::LBrace);
+
+    let mut body = vec![];
+    while self.peek() != Token::RBrace {
+        body.push(self.parse_node());
+    }
+
+    self.expect(Token::RBrace);
+
+    Node::Function { name, params, body }
 }
 
 
@@ -441,11 +495,10 @@ fn parse_text(&mut self) -> Node {
                     }
                     "value" => {
                         if let Token::String(s) = self.advance() {
-    value = Some(s);
-} else {
-    panic!("Expected string for value");
-}
-
+                            value = Some(Expr::StringLiteral(s));
+                        } else {
+                            panic!("Expected string for value");
+                        }
                     }
                     _ => panic!("Unknown text property '{}'", name),
                 }
@@ -466,6 +519,7 @@ fn parse_text(&mut self) -> Node {
         value: value.expect("Missing value"),
     }
 }
+
 fn parse_list(&mut self) -> Node {
     self.expect_ident("list");
     self.expect(Token::LParen);
@@ -626,6 +680,11 @@ fn parse_primary(&mut self) -> Expr {
             self.advance();
             Expr::Literal(n)
         },
+        Token::String(ref s) => {
+            let s = s.clone(); // clone before consuming
+            self.advance();
+            Expr::StringLiteral(s)
+        },
         Token::LParen => {
             self.advance();
             let expr = self.parse_expr();
@@ -641,12 +700,30 @@ fn parse_primary(&mut self) -> Expr {
             Expr::Layout(Box::new(node))
         },
         Token::Ident(ref s) => {
+            let name = s.clone();
             self.advance();
-            Expr::Identifier(s.clone())
+
+            if self.peek() == Token::LParen {
+                self.advance(); // skip (
+                let mut args = vec![];
+                while self.peek() != Token::RParen {
+                    let arg = self.parse_expr();
+                    args.push(arg);
+
+                    if self.peek() == Token::Comma {
+                        self.advance();
+                    }
+                }
+                self.expect(Token::RParen);
+                Expr::Call { name, args }
+            } else {
+                Expr::Identifier(name)
+            }
         },
         t => panic!("Unexpected token in primary expression: {:?}", t),
     }
 }
+
 
 
 
