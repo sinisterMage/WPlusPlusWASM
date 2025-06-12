@@ -565,7 +565,7 @@ pub fn compile_expr(
             offset: 0,
             memory_index: 0,
         }));
-        instructions.push(Instruction::Drop);
+        //instructions.push(Instruction::Drop);
     }
 
     // ✅ VERY IMPORTANT:
@@ -804,7 +804,8 @@ let returned: i32 = compile_expr(
         instructions.push(Instruction::LocalSet(*local_idx));
         local_map.insert(name.clone(), *local_idx);
         local_types.insert(name.clone(), ty);
-        *stack_counter -= 1;
+        //*stack_counter -= 1;
+        
         *local_idx += 1;
 
     }
@@ -1049,11 +1050,13 @@ instructions.push(Instruction::Call(MARK_USED_FUNC));
             // Add to GC root
             instructions.push(Instruction::LocalGet(0));
             instructions.push(Instruction::Call(ADD_ROOT_FUNC));
+            instructions.push(Instruction::Drop); // 🧯 DROP
             
 
             // Mark used
             instructions.push(Instruction::LocalGet(0));
             instructions.push(Instruction::Call(MARK_USED_FUNC));
+            instructions.push(Instruction::Drop); // 🧯 DROP
             
 
             // Write bytes

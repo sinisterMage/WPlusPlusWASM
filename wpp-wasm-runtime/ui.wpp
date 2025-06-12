@@ -1,25 +1,6 @@
-func describe(x: int) {
-  text(x: 10, y: 10, value: "int")
-}
 
-func describe(x: string) {
-  text(x: 10, y: 30, value: "string")
-}
-
-func add(x: int, y: int) {
-  text(x: 10, y: 50, value: "sum int")
-}
-
-func add(x: string, y: string) {
-  text(x: 10, y: 70, value: "concat str")
-}
 
 let a = 5
-let b = 10
-let s1 = "hello"
-let s2 = "world"
 
-describe(a)
-describe(s1)
-add(a, b)
-add(s1, s2)
+
+
