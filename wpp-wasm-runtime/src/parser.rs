@@ -49,6 +49,11 @@ Function {
 
 
 }
+#[derive(Clone)]
+pub struct FunctionMeta {
+    pub node: Node,
+    pub returns: usize,
+}
 
 
 
