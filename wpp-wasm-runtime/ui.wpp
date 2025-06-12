@@ -1,6 +1,6 @@
+func greet() {
+    text(x: 30, y: 60, value: "hi from func")
+}
 
-
-let a = 5
-
-
+greet()
 

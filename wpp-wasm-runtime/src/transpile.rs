@@ -1050,13 +1050,13 @@ instructions.push(Instruction::Call(MARK_USED_FUNC));
             // Add to GC root
             instructions.push(Instruction::LocalGet(0));
             instructions.push(Instruction::Call(ADD_ROOT_FUNC));
-            instructions.push(Instruction::Drop); // 🧯 DROP
+            
             
 
             // Mark used
             instructions.push(Instruction::LocalGet(0));
             instructions.push(Instruction::Call(MARK_USED_FUNC));
-            instructions.push(Instruction::Drop); // 🧯 DROP
+            
             
 
             // Write bytes
@@ -1178,29 +1178,20 @@ println!("  📎 Item '{}': → rendered at ({}, {})", value, x, y);
 
 
         Node::Expr(expr) => {
-    let delta = compile_expr(
-        expr,
-        instructions,
-        map,
-        offset_counter,
-        local_map,
-        local_types,
-        wasm_locals,
-        function_indices,
-        function_signatures,
+    let result = compile_expr(
+        expr, instructions, map, offset_counter, local_map,
+        local_types, wasm_locals, function_indices, function_signatures,
         stack_counter,
     );
 
-    if delta > 0 {
-        for _ in 0..delta {
-            instructions.push(Instruction::Drop);
-        }
-        *stack_counter -= delta;
-        println!("🧯 Dropped {} unused return value(s)", delta);
+    if result > 0 {
+        instructions.push(Instruction::Drop);
+        *stack_counter -= 1;
     }
 
-    0
+    0 // <- always return 0 for Node-level expr
 }
+
 
 
 

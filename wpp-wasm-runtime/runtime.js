@@ -118,16 +118,21 @@ async function runWasm() {
         const bytes = await response.arrayBuffer();
 
         const { instance: wasmInstance } = await WebAssembly.instantiate(bytes, {
-            env: {
-                memory,
-                drawRect,
-                drawText,
-                gc_alloc,
-                add_root,
-                gc_collect,
-                gc_tick: () => {},
-            },
-        });
+    env: {
+        memory,
+        drawRect,
+        drawText,
+        gc_alloc,
+        add_root,
+        gc_collect,
+        gc_tick: () => {},
+        mark_used: (ptr) => {
+            console.log(`🧷 mark_used(${ptr})`);
+            // For now, it's just a placeholder
+        },
+    },
+});
+
 
         window.instance = wasmInstance;
         heap = new Uint8Array(memory.buffer);
