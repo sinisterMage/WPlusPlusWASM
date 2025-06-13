@@ -1079,6 +1079,7 @@ instructions.push(Instruction::Call(MARK_USED_FUNC));
             instructions.push(Instruction::I32Const(*y));
             instructions.push(Instruction::LocalGet(0));
             instructions.push(Instruction::I32Const(len));
+            println!("🖍️ Emitting drawText({}, {}, ptr, {})", x, y, len);
             instructions.push(Instruction::Call(DRAW_TEXT_FUNC));
 
 
