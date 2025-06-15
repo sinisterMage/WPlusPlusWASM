@@ -77,8 +77,8 @@ pub fn compile_to_wasm(ast: &[Node]) -> (Vec<u8>, String) {
 
     // === Index prep ===
     let imported_funcs = 6; // ✅ six imported functions (not counting memory)
-let gc_tick_func_index = imported_funcs as u32; // = 6
-let draw_ui_func_index = gc_tick_func_index + 1; // = 7
+let draw_ui_func_index = imported_funcs as u32; // = 6
+let gc_tick_func_index = draw_ui_func_index + 1; // = 7
 let user_func_start_index = draw_ui_func_index + 1; // = 8
 
 
@@ -312,6 +312,10 @@ for node in ast {
             &mut stack_counter,
             &mut local_idx,
         );
+// 🧠 Manually emit Call instruction if this is a top-level function call
+
+
+
 
         println!("🟢 [compile_to_wasm] Stack returned = {}", stack);
 let mut sim_stack = 0;
@@ -433,6 +437,30 @@ println!("🔍 FINAL STACK COUNT before `end`: {}", draw_ui_stack);
 if draw_ui_stack != 0 {
     println!("❌ Stack counter at end of draw_ui is {}, expected 0", draw_ui_stack);
     panic!("Unbalanced stack in draw_ui");
+}
+
+// 🔍 Add a call to greet() manually
+// 🔍 Simulate a top-level call to greet()
+let greet_sig = FunctionSignature {
+    name: "greet".to_string(),
+    param_types: vec![],
+};
+if let Some(index) = function_indices.get(&greet_sig) {
+    println!("📣 Simulating top-level call to greet() → index {}", index);
+
+    let call_instr = Instruction::Call(*index);
+    instructions.push(call_instr);
+
+    // simulate stack changes like normal top-level call
+    let ret_count = function_signatures[&greet_sig].returns;
+    if ret_count > 0 {
+        println!("🪓 [Top-Level] Dropping {} return values from greet()", ret_count);
+        for _ in 0..ret_count {
+            instructions.push(Instruction::Drop);
+        }
+    }
+} else {
+    println!("❌ Could not find 'greet()' in function_indices");
 }
 
 
@@ -1041,40 +1069,35 @@ instructions.push(Instruction::Call(MARK_USED_FUNC));
             let len = s.len() as i32;
             println!("➡️ Allocating text buffer for string of length {}", len);
 
-            // Allocate buffer
+            // Allocate buffer and tee to local[0]
             instructions.push(Instruction::I32Const(len));
             instructions.push(Instruction::I32Const(TYPE_TEXT));
             instructions.push(Instruction::Call(GC_ALLOC_FUNC));
-            instructions.push(Instruction::LocalSet(0)); // Store in local[0]
+            instructions.push(Instruction::LocalTee(0)); // Save to local[0] AND keep on stack
 
             // Add to GC root
-            instructions.push(Instruction::LocalGet(0));
             instructions.push(Instruction::Call(ADD_ROOT_FUNC));
-            
-            
 
             // Mark used
             instructions.push(Instruction::LocalGet(0));
             instructions.push(Instruction::Call(MARK_USED_FUNC));
-            
-            
 
-            // Write bytes
+            // Write bytes to ptr - 8 with offset
             println!("✍️ Writing string bytes to memory:");
             for (i, byte) in s.bytes().enumerate() {
-                instructions.push(Instruction::LocalGet(0));
-                instructions.push(Instruction::I32Const(i as i32));
-                instructions.push(Instruction::I32Add);
-                instructions.push(Instruction::I32Const(byte as i32));
-                instructions.push(Instruction::I32Store8(MemArg {
-                    align: 0,
-                    offset: 0,
-                    memory_index: 0,
-                }));
-                println!("   ↳ Wrote byte '{}' at offset {}", byte as char, i);
-            }
+    instructions.push(Instruction::LocalGet(0));         // ptr
+    instructions.push(Instruction::I32Const(i as i32));  // i
+    instructions.push(Instruction::I32Add);              // ptr + i
+    instructions.push(Instruction::I32Const(byte as i32));
+    instructions.push(Instruction::I32Store8(MemArg {
+        align: 0,
+        offset: 0,               // not i!
+        memory_index: 0,
+    }));
+}
 
-            // Draw the string
+
+            // Draw text
             instructions.push(Instruction::I32Const(*x));
             instructions.push(Instruction::I32Const(*y));
             instructions.push(Instruction::LocalGet(0));
@@ -1082,9 +1105,6 @@ instructions.push(Instruction::Call(MARK_USED_FUNC));
             println!("🖍️ Emitting drawText({}, {}, ptr, {})", x, y, len);
             instructions.push(Instruction::Call(DRAW_TEXT_FUNC));
 
-
-
-            // ✅ No value left on stack (everything was consumed)
             false
         }
 
@@ -1094,8 +1114,9 @@ instructions.push(Instruction::Call(MARK_USED_FUNC));
                 instructions.push(Instruction::I32Const(*x));
                 instructions.push(Instruction::I32Const(*y));
                 instructions.push(Instruction::LocalGet(idx));
-                instructions.push(Instruction::I32Const(999)); // estimated length
+                instructions.push(Instruction::I32Const(999)); // placeholder
                 instructions.push(Instruction::Call(DRAW_TEXT_FUNC));
+                instructions.push(Instruction::Drop);
                 println!("🖼️ Drew text from variable '{}'", var);
                 false
             } else {
@@ -1116,11 +1137,12 @@ instructions.push(Instruction::Call(MARK_USED_FUNC));
     });
 
     if leaves_value_on_stack {
-        1 // ← will be dropped by caller if needed
+        1
     } else {
-        0 // ← no value left on stack
+        0
     }
 }
+
 
 
 
