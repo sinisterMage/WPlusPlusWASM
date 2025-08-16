@@ -1,0 +1,43 @@
+name: FreeBSD Release Build
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-freebsd:
+    runs-on: ubuntu-latest
+    name: Build FreeBSD Binaries
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      - name: Install cross
+        run: cargo install cross --git https://github.com/cross-rs/cross
+
+      - name: Build wpp_wasm_runtime
+        run: cross build --release --target x86_64-unknown-freebsd -p wpp_wasm_runtime
+
+      - name: Build ingot_cli
+        run: cross build --release --target x86_64-unknown-freebsd -p ingot_cli
+
+      - name: Prepare release artifacts
+        run: |
+          mkdir release
+          cp target/x86_64-unknown-freebsd/release/wpp_wasm_runtime release/
+          cp target/x86_64-unknown-freebsd/release/ingot_cli release/
+          cd release
+          zip wpp_freebsd_release.zip wpp_wasm_runtime ingot_cli
+          cd ..
+
+      - name: Upload Release Asset
+        uses: softprops/action-gh-release@v1
+        with:
+          files: release/wpp_freebsd_release.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

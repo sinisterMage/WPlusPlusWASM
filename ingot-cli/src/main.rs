@@ -1,11 +1,12 @@
 use clap::{Parser, Subcommand};
 use std::fs;
 use std::process::Command;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 use std::thread::sleep;
 use std::fs::metadata;
 use serde::Deserialize;
+use std::env;
 
 #[derive(Parser)]
 #[command(name = "wingot")]
@@ -47,13 +48,35 @@ fn load_config() -> Option<WppConfig> {
     }
 }
 
+/// Resolve the path to `wpp_wasm_runtime`
+/// 1. Look in the same folder as the CLI binary
+/// 2. Otherwise, assume it's in PATH
+fn resolve_runtime() -> PathBuf {
+    let exe_dir = env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(|d| d.to_path_buf()))
+        .unwrap_or_else(|| PathBuf::from("."));
+
+    let local_path = exe_dir.join("wpp_wasm_runtime");
+
+    if local_path.exists() {
+        local_path
+    } else {
+        PathBuf::from("wpp_wasm_runtime") // fallback: rely on PATH
+    }
+}
+
 fn main() {
     let cli = Cli::parse();
 
     match &cli.command {
         Commands::Init { name } => {
             let path = Path::new(name);
-            fs::create_dir_all(path).unwrap();
+            if let Err(e) = fs::create_dir_all(path) {
+                eprintln!("❌ Failed to create project folder: {e}");
+                std::process::exit(1);
+            }
+
             let wpp_json = format!(
 r#"{{
   "name": "{}",
@@ -66,7 +89,11 @@ r#"{{
   "output": "wpp.wasm"
 }}"#, name);
 
-            fs::write(path.join("wpp.json"), wpp_json).unwrap();
+            if let Err(e) = fs::write(path.join("wpp.json"), wpp_json) {
+                eprintln!("❌ Failed to write wpp.json: {e}");
+                std::process::exit(1);
+            }
+
             fs::write(path.join("main.wpp"), include_str!("../templates/main.wpp")).unwrap();
             fs::write(path.join("index.html"), include_str!("../templates/index.html")).unwrap();
             fs::write(path.join("wpp_loader.js"), include_str!("../templates/wpp_loader.js")).unwrap();
@@ -105,34 +132,43 @@ r#"{{
             }
 
             let mut last_modified = metadata(&file_path).unwrap().modified().unwrap();
+            let runtime = resolve_runtime();
 
             loop {
                 println!("⚙️ Compiling {} to WASM...", file_path);
-                let compile = Command::new("wppc")
+
+                let status = Command::new(&runtime)
                     .arg(&file_path)
                     .arg("-o")
                     .arg(&output_file)
-                    .status()
-                    .expect("❌ Failed to run compiler");
+                    .status();
 
-                if !compile.success() {
-                    eprintln!("❌ Compilation failed.");
-                    if !watch {
-                        break;
-                    }
-                } else {
-                    if target == "native" {
-                        println!("🚀 Running {} with Wasmtime...", output_file);
-                        let run = Command::new("wasmtime")
-                            .arg(&output_file)
-                            .status()
-                            .expect("❌ Failed to run Wasmtime");
+                match status {
+                    Ok(s) if s.success() => {
+                        if target == "native" {
+                            println!("🚀 Running {} with Wasmtime...", output_file);
+                            let run = Command::new("wasmtime")
+                                .arg(&output_file)
+                                .status();
 
-                        if !run.success() {
-                            eprintln!("❌ Runtime error.");
+                            match run {
+                                Ok(r) if r.success() => {}
+                                Ok(_) => eprintln!("❌ Runtime error."),
+                                Err(e) => eprintln!("❌ Failed to launch Wasmtime: {e}"),
+                            }
+                        } else {
+                            println!("🕸️ WebAssembly build complete – open index.html in a browser to run.");
                         }
-                    } else {
-                        println!("🕸️ WebAssembly build complete – open index.html in a browser to run.");
+                    }
+                    Ok(_) => {
+                        eprintln!("❌ Compilation failed (runtime returned error).");
+                        if !watch {
+                            break;
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("❌ Failed to run compiler: {e}");
+                        std::process::exit(1);
                     }
                 }
 

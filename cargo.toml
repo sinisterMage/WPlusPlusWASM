@@ -1,0 +1,8 @@
+[workspace]
+members = [
+    "ingot-cli",
+    "wpp-wasm-runtime"
+]
+exclude = [
+    "wpp_gc_runtime"
+]
